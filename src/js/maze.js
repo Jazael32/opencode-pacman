@@ -51,12 +51,25 @@ const MAZE = MAZE_STR.map( ( row ) => row.split( '' ).map( parseTile ) );
 
 const TUNNEL_ROW = 14;
 const PACMAN_START = { x: 13, y: 23 };
+// Fantasmas del arcade. Blinky inicia fuera de la pen (sobre la puerta, fila 11);
+// pinky, inky y clyde dentro (interior cols 11-16, filas 13-15).
 const GHOST_STARTS = [
-  { x: 13, y: 14, kind: 'hunter' }, // dentro de la pen
-  { x: 14, y: 14, kind: 'random' }, // dentro de la pen
+  { x: 13, y: 11, kind: 'blinky' }, // fuera de la pen, junto a la puerta
+  { x: 13, y: 14, kind: 'pinky' },  // dentro de la pen
+  { x: 12, y: 14, kind: 'inky' },
+  { x: 15, y: 14, kind: 'clyde' },
 ];
+
+// Esquina scatter de cada fantasma (objetivo del modo scatter).
+const SCATTER_TARGETS = {
+  blinky: { x: 26, y: 1 },  // esquina sup. derecha
+  pinky:  { x: 1,  y: 1 },  // esquina sup. izquierda
+  inky:   { x: 26, y: 29 }, // esquina inf. derecha
+  clyde:  { x: 1,  y: 29 }, // esquina inf. izquierda
+};
 
 window.MAZE = MAZE;
 window.TUNNEL_ROW = TUNNEL_ROW;
 window.PACMAN_START = PACMAN_START;
 window.GHOST_STARTS = GHOST_STARTS;
+window.SCATTER_TARGETS = SCATTER_TARGETS;
