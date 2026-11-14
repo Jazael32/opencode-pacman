@@ -5,6 +5,8 @@ const TILE = 20;
 const WALL_COLOR = '#2121ff';
 const DOOR_COLOR = '#ffb8ff';
 const DOT_COLOR = '#ffb897';
+const FRIGHT_COLOR = '#2121de'; // cuerpo frightened (azul arcade)
+const BLINK_PERIOD = 15;        // frames por fase de los parpadeos (pellet y flash)
 
 function cellCenter( x, y ) {
   return { cx: x * TILE + TILE / 2, cy: y * TILE + TILE / 2 };
@@ -66,7 +68,8 @@ function drawDoor( ctx, grid ) {
   ctx.stroke();
 }
 
-function drawDots( ctx, grid ) {
+function drawDots( ctx, grid, frame ) {
+  // Dots: siempre visibles.
   ctx.fillStyle = DOT_COLOR;
   for ( let y = 0; y < grid.length; y++ ) {
     for ( let x = 0; x < grid[ 0 ].length; x++ ) {
@@ -74,6 +77,18 @@ function drawDots( ctx, grid ) {
       const { cx, cy } = cellCenter( x, y );
       ctx.beginPath();
       ctx.arc( cx, cy, 2.5, 0, Math.PI * 2 );
+      ctx.fill();
+    }
+  }
+  // Pellets (4): circulo grande que parpadea visible/invisible cada ~15 frames.
+  if ( Math.floor( frame / BLINK_PERIOD ) % 2 !== 0 ) return;
+  ctx.fillStyle = DOT_COLOR;
+  for ( let y = 0; y < grid.length; y++ ) {
+    for ( let x = 0; x < grid[ 0 ].length; x++ ) {
+      if ( grid[ y ][ x ] !== 4 ) continue;
+      const { cx, cy } = cellCenter( x, y );
+      ctx.beginPath();
+      ctx.arc( cx, cy, 6, 0, Math.PI * 2 );
       ctx.fill();
     }
   }
@@ -98,10 +113,51 @@ function drawPacman( ctx, p, frame ) {
   ctx.fill();
 }
 
-function drawGhost( ctx, g, color ) {
+// Ojos mirando segun direccion. pupil: color de la pupila, o null para ojos
+// blancos sin pupila (fright).
+function drawEyes( ctx, cx, cy, dir, pupil ) {
+  const d = DIRS[ dir ] || { x: 0, y: 0 };
+  const ex = d.x * 1.6;
+  const ey = d.y * 1.6;
+  for ( const off of [ -3.5, 3.5 ] ) {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc( cx + off, cy - 1, 3, 0, Math.PI * 2 );
+    ctx.fill();
+    if ( pupil ) {
+      ctx.fillStyle = pupil;
+      ctx.beginPath();
+      ctx.arc( cx + off + ex, cy - 1 + ey, 1.5, 0, Math.PI * 2 );
+      ctx.fill();
+    }
+  }
+}
+
+function drawGhost( ctx, game, g ) {
   const { cx, cy } = cellCenter( g.x, g.y );
+
+  // Ojos solos: eaten/entering se dibujan sin cuerpo.
+  if ( g.phase === 'eaten' || g.phase === 'entering' ) {
+    drawEyes( ctx, cx, cy, g.dir, '#0000bb' );
+    return;
+  }
+
+  let color = GHOST_COLORS[ g.kind ] || '#ff0000';
+  let pupil = '#0000bb';
+
+  // Fright: cuerpo azul con ojos blancos; en los ultimos FRIGHT_FLASH_AT
+  // frames alterna azul <-> blanco cada BLINK_PERIOD frames.
+  if ( game.frightTimer > 0 && g.phase === 'active' ) {
+    color = FRIGHT_COLOR;
+    pupil = null;
+    if ( game.frightTimer <= FRIGHT_FLASH_AT &&
+         Math.floor( ( FRIGHT_FLASH_AT - game.frightTimer ) / BLINK_PERIOD ) % 2 === 1 ) {
+      color = '#fff';         // cuerpo blanco en la fase de flash
+      pupil = FRIGHT_COLOR;   // pupila azul para que se vea sobre blanco
+    }
+  }
+
   const r = TILE / 2 - 1;
-  const top = cy - r;
   const bottom = cy + r;
   const left = cx - r;
   const right = cx + r;
@@ -118,20 +174,7 @@ function drawGhost( ctx, g, color ) {
   ctx.closePath();
   ctx.fill();
 
-  // ojos mirando segun direccion
-  const dir = DIRS[ g.dir ] || { x: 0, y: 0 };
-  const ex = dir.x * 1.6;
-  const ey = dir.y * 1.6;
-  for ( const off of [ -3.5, 3.5 ] ) {
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc( cx + off, cy - 1, 3, 0, Math.PI * 2 );
-    ctx.fill();
-    ctx.fillStyle = '#0000bb';
-    ctx.beginPath();
-    ctx.arc( cx + off + ex, cy - 1 + ey, 1.5, 0, Math.PI * 2 );
-    ctx.fill();
-  }
+  drawEyes( ctx, cx, cy, g.dir, pupil );
 }
 
 function drawHUD( ctx, game, W ) {
@@ -162,9 +205,9 @@ function draw( ctx, game, frame ) {
 
   drawWalls( ctx, grid );
   drawDoor( ctx, grid );
-  drawDots( ctx, grid );
+  drawDots( ctx, grid, frame );
   drawPacman( ctx, game.pacman, frame );
-  game.ghosts.forEach( ( g ) => drawGhost( ctx, g, GHOST_COLORS[ g.kind ] || '#ff0000' ) );
+  game.ghosts.forEach( ( g ) => drawGhost( ctx, game, g ) );
   drawHUD( ctx, game, W );
 }
 
