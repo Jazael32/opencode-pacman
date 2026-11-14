@@ -465,3 +465,4 @@ function update( game ) {
 window.createGame = createGame;
 window.update = update;
 window.DIRS = DIRS;
+window.FRIGHT_FLASH_AT = FRIGHT_FLASH_AT; // la usa render.js para el flash
