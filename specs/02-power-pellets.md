@@ -69,16 +69,21 @@ Convenciones: coordenadas en celdas, tiempos en frames (~60 fps), velocidades qu
 
 ## Criterios de aceptación
 
-- [ ] La consola no muestra errores al abrir `src/index.html`.
-- [ ] El maze conserva 31 strings de 28 chars, simetría vertical y extremos del túnel abiertos.
-- [ ] Se ven 4 pellets grandes parpadeando en las esquinas interiores `(1,3)`, `(26,3)`, `(1,23)`, `(26,23)`; cada uno vale 50 puntos.
-- [ ] Al comer un pellet los fantasmas activos invierten dirección y se ponen azules.
-- [ ] Fantasmas frightened huyen y no matan a Pacman al contacto; comérselos da 200/400/800/1600 según la cadena.
-- [ ] El fantasma comido vuelve como ojos, cruza la puerta, revive en la pen y vuelve a salir.
-- [ ] En los últimos ~2 s de fright los fantasmas parpadean azul/blanco; al agotarse vuelven a su color y comportamiento.
-- [ ] El ciclo scatter/chase no pierde tiempo durante el fright (se reanuda donde estaba).
-- [ ] Perder una vida limpia el fright y repite el escalonado de la pen igual que al inicio.
-- [ ] La partida se gana solo tras comer dots y pellets (279 ítems: 275 dots + 4 pellets), no solo los dots.
+- [x] La consola no muestra errores al abrir `src/index.html`.
+- [x] El maze conserva 31 strings de 28 chars, simetría vertical y extremos del túnel abiertos.
+- [x] Se ven 4 pellets grandes parpadeando en las esquinas interiores `(1,3)`, `(26,3)`, `(1,23)`, `(26,23)`; cada uno vale 50 puntos.
+- [x] Al comer un pellet los fantasmas activos invierten dirección y se ponen azules.
+- [x] Fantasmas frightened huyen y no matan a Pacman al contacto; comérselos da 200/400/800/1600 según la cadena.
+- [x] El fantasma comido vuelve como ojos, cruza la puerta, revive en la pen y vuelve a salir.
+- [x] En los últimos ~2 s de fright los fantasmas parpadean azul/blanco; al agotarse vuelven a su color y comportamiento.
+- [x] El ciclo scatter/chase no pierde tiempo durante el fright (se reanuda donde estaba).
+- [x] Perder una vida limpia el fright y repite el escalonado de la pen igual que al inicio.
+- [x] La partida se gana solo tras comer dots y pellets (279 ítems: 275 dots + 4 pellets), no solo los dots.
+
+> Validación: suite headless (Node) que carga los 4 scripts, simula DOM/canvas y ejecuta
+> partida + render: 11/11 checks PASS (ver detalle en la conversación del 2026-11-14).
+> El criterio de consola sin errores se validó simulando la carga de `index.html`
+> (mock de DOM + 200 frames del loop); recomendable un vistazo visual final en navegador.
 
 ## Decisiones
 
