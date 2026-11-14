@@ -1,6 +1,6 @@
 // game.js
 // Estado y reglas. Depende de globals de maze.js: MAZE, TUNNEL_ROW,
-// PACMAN_START, GHOST_STARTS.
+// PACMAN_START, GHOST_STARTS, SCATTER_TARGETS.
 
 const DIRS = {
   left: { x: -1, y: 0 },
@@ -128,9 +128,43 @@ function movePacman( game ) {
   wrapTunnel( p, width );
 }
 
+// Celda objetivo de cada fantasma segun su personalidad (modo chase).
+function chaseTarget( game, g ) {
+  const p = game.pacman;
+  const px = Math.round( p.x );
+  const py = Math.round( p.y );
+
+  if ( g.kind === 'blinky' ) {
+    // Agresivo: apunta a la celda de Pacman.
+    return { x: px, y: py };
+  }
+
+  if ( g.kind === 'pinky' ) {
+    // Corta el paso: 4 celdas delante de Pacman segun su direccion actual.
+    const d = DIRS[ p.dir ];
+    return { x: px + 4 * d.x, y: py + 4 * d.y };
+  }
+
+  if ( g.kind === 'inky' ) {
+    // Flanqueo: punto 2 celdas delante de Pacman; se duplica el vector desde
+    // blinky hasta ese punto (posicion de blinky tal cual, este o no en la pen).
+    const d = DIRS[ p.dir ];
+    const ax = px + 2 * d.x;
+    const ay = py + 2 * d.y;
+    const b = game.ghosts.find( ( o ) => o.kind === 'blinky' );
+    const bx = Math.round( b ? b.x : px );
+    const by = Math.round( b ? b.y : py );
+    return { x: 2 * ax - bx, y: 2 * ay - by };
+  }
+
+  // clyde: persigue a distancia (>8 celdas Manhattan); cerca, huye a su esquina.
+  const dist = Math.abs( Math.round( g.x ) - px ) + Math.abs( Math.round( g.y ) - py );
+  if ( dist > 8 ) return { x: px, y: py };
+  return SCATTER_TARGETS[ g.kind ];
+}
+
 function decideGhost( game, g ) {
   const grid = game.grid;
-  const p = game.pacman;
 
   const options = Object.keys( DIRS ).filter(
     ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
@@ -138,25 +172,22 @@ function decideGhost( game, g ) {
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
 
-  if ( g.kind === 'hunter' ) {
-    const px = Math.round( p.x );
-    const py = Math.round( p.y );
-    let best = choices[ 0 ];
-    let bestDist = Infinity;
-    for ( const dir of choices ) {
-      const d = DIRS[ dir ];
-      const nx = g.x + d.x;
-      const ny = g.y + d.y;
-      const dist = Math.abs( nx - px ) + Math.abs( ny - py );
-      if ( dist < bestDist ) {
-        bestDist = dist;
-        best = dir;
-      }
+  // Steering voraz por distancia Manhattan hacia el objetivo, igual que el
+  // hunter original.
+  const t = chaseTarget( game, g );
+  let best = choices[ 0 ];
+  let bestDist = Infinity;
+  for ( const dir of choices ) {
+    const d = DIRS[ dir ];
+    const nx = g.x + d.x;
+    const ny = g.y + d.y;
+    const dist = Math.abs( nx - t.x ) + Math.abs( ny - t.y );
+    if ( dist < bestDist ) {
+      bestDist = dist;
+      best = dir;
     }
-    g.dir = best;
-  } else {
-    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
   }
+  g.dir = best;
 }
 
 function moveGhost( game, g ) {
