@@ -201,6 +201,24 @@ function ghostSpeed( game, g ) {
   return GHOST_SPEED;
 }
 
+// Voraz euclidea^2 entre choices hacia target (compartido por scatter/chase
+// y por los ojos; Manhattan empata en el tunel y cicla a los fantasmas).
+function greedyDir( grid, g, choices, target ) {
+  let best = choices[ 0 ];
+  let bestDist = Infinity;
+  for ( const dir of choices ) {
+    const d = DIRS[ dir ];
+    const nx = g.x + d.x;
+    const ny = g.y + d.y;
+    const dist = ( nx - target.x ) * ( nx - target.x ) + ( ny - target.y ) * ( ny - target.y );
+    if ( dist < bestDist ) {
+      bestDist = dist;
+      best = dir;
+    }
+  }
+  return best;
+}
+
 function decideGhost( game, g ) {
   const grid = game.grid;
 
@@ -217,23 +235,10 @@ function decideGhost( game, g ) {
     return;
   }
 
-  // Steering voraz por distancia euclidea al cuadrado hacia el objetivo
-  // (como el arcade; Manhattan empata en el tunel y cicla a los fantasmas).
+  // Steering voraz por distancia euclidea al cuadrado hacia el objetivo.
   // En scatter todos apuntan a su esquina.
   const t = game.ghostMode === 'scatter' ? SCATTER_TARGETS[ g.kind ] : chaseTarget( game, g );
-  let best = choices[ 0 ];
-  let bestDist = Infinity;
-  for ( const dir of choices ) {
-    const d = DIRS[ dir ];
-    const nx = g.x + d.x;
-    const ny = g.y + d.y;
-    const dist = ( nx - t.x ) * ( nx - t.x ) + ( ny - t.y ) * ( ny - t.y );
-    if ( dist < bestDist ) {
-      bestDist = dist;
-      best = dir;
-    }
-  }
-  g.dir = best;
+  g.dir = greedyDir( grid, g, choices, t );
 }
 
 function moveGhost( game, g ) {
@@ -289,6 +294,68 @@ function moveLeaving( g ) {
   g.y = LEAVE_ROW;
   g.dir = 'left'; // sale mirando a la izquierda, como en el arcade
   g.phase = 'active';
+}
+
+// --- Ojos (fase eaten) y retorno a la pen (fase entering) ---
+
+// Celda sobre la puerta, destino de los ojos.
+const EYES_TARGET = { x: 13, y: 11 };
+// Fondo de la pen: donde revive el fantasma comido.
+const ENTER_TARGET = { x: 13, y: 14 };
+// Multiplo comun de 0.05/0.1/0.2: los ojos avanzan en sub-pasos de 0.05 para
+// que el cambio a EYES_SPEED a mitad de celda (la colision no espera al
+// cruce) nunca salte un centro de celda y desincronice aligned().
+const EYES_SUBSTEP = 0.05; // EYES_SPEED 0.2 = 4 sub-pasos por frame
+
+// Decision voraz de los ojos hacia la celda sobre la puerta (mismo mecanismo
+// euclidea^2 del scatter, con objetivo fijo).
+function decideEaten( game, g ) {
+  const grid = game.grid;
+  const options = Object.keys( DIRS ).filter(
+    ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
+  );
+  const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
+  g.dir = greedyDir( grid, g, choices, EYES_TARGET );
+}
+
+function moveEaten( game, g ) {
+  const grid = game.grid;
+  const width = grid[ 0 ].length;
+
+  for ( let i = 0; i < 4; i++ ) {
+    if ( aligned( g.x ) && aligned( g.y ) ) {
+      g.x = Math.round( g.x );
+      g.y = Math.round( g.y );
+      // Llego a la puerta: pasa a entrar en la pen.
+      if ( g.x === EYES_TARGET.x && g.y === EYES_TARGET.y ) {
+        g.phase = 'entering';
+        g.dir = 'down';
+        return;
+      }
+      decideEaten( game, g );
+      if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
+    }
+    const d = DIRS[ g.dir ];
+    g.x += d.x * EYES_SUBSTEP;
+    g.y += d.y * EYES_SUBSTEP;
+    wrapTunnel( g, width );
+  }
+}
+
+// Entrada a la pen por la puerta: bajar desde (13,11) hasta (13,14). Al
+// llegar revive en la pen con releaseDelay 0 (vuelve a salir de inmediato).
+function moveEntering( g ) {
+  const dy = ENTER_TARGET.y - g.y;
+  if ( Math.abs( dy ) > 1e-3 ) {
+    g.dir = 'down';
+    g.y += Math.sign( dy ) * Math.min( g.speed, Math.abs( dy ) );
+    return;
+  }
+  g.y = ENTER_TARGET.y;
+  g.phase = 'pen';
+  g.releaseDelay = 0;
+  g.dir = 'up';           // rebote/salida igual que el resto
+  g.speed = GHOST_SPEED;  // deja la velocidad de ojos
 }
 
 function resetPositions( game ) {
@@ -357,13 +424,27 @@ function update( game ) {
       }
     } else if ( g.phase === 'leaving' ) {
       moveLeaving( g );
+    } else if ( g.phase === 'eaten' ) {
+      moveEaten( game, g );
+    } else if ( g.phase === 'entering' ) {
+      moveEntering( g );
     } else {
       moveGhost( game, g );
     }
   }
 
   for ( const g of game.ghosts ) {
-    if ( collides( game.pacman, g ) ) {
+    if ( !collides( game.pacman, g ) ) continue;
+    // Ojos (y pen/leaving): no colisionan con Pacman ni son comibles.
+    if ( g.phase !== 'active' ) continue;
+    if ( game.frightTimer > 0 ) {
+      // Comer fantasma: puntaje encadenado del arcade 200/400/800/1600
+      // (se reinicia con cada pellet). El fantasma pasa a ojos.
+      game.score += 200 << game.ghostChain;
+      game.ghostChain++;
+      g.phase = 'eaten';
+      g.speed = EYES_SPEED;
+    } else {
       game.lives--;
       if ( game.lives <= 0 ) {
         game.state = 'lost';
