@@ -21,8 +21,8 @@ const RELEASE_DELAYS = { blinky: 0, pinky: 120, inky: 240, clyde: 360 };
 // Posiciones dentro de la pen (interior cols 11-16, filas 13-15) para el
 // rearme tras perder una vida: los 4 fantasmas vuelven a la pen.
 const PEN_STARTS = {
-  blinky: { x: 14, y: 14 },
-  pinky:  { x: 13, y: 14 },
+  blinky: { x: 13, y: 14 }, // centrado bajo la puerta: sale en 32 frames exactos
+  pinky:  { x: 14, y: 14 }, // se centra en la col 13 mientras espera
   inky:   { x: 12, y: 14 },
   clyde:  { x: 15, y: 14 },
 };
@@ -76,13 +76,15 @@ function aligned( v ) {
 
 // Una celda es muro para el actor dado?
 //   pacman: bloqueado por pared (1) y puerta (3)
-//   ghost:  bloqueado solo por pared (1)
+//   ghost:  bloqueado por pared (1) y tambien por la puerta (3): solo se cruza
+//           saliendo de la pen (moveLeaving no usa canMove), asi los fantasmas
+//           activos no reentran a la pen.
 function isWall( grid, x, y, actor ) {
   if ( y < 0 || y >= grid.length ) return true;
   if ( x < 0 || x >= grid[ 0 ].length ) return true;
   const v = grid[ y ][ x ];
   if ( v === 1 ) return true;
-  if ( v === 3 && actor === 'pacman' ) return true;
+  if ( v === 3 ) return true;
   return false;
 }
 
@@ -178,8 +180,9 @@ function decideGhost( game, g ) {
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
 
-  // Steering voraz por distancia Manhattan hacia el objetivo, igual que el
-  // hunter original. En scatter todos apuntan a su esquina.
+  // Steering voraz por distancia euclidea al cuadrado hacia el objetivo
+  // (como el arcade; Manhattan empata en el tunel y cicla a los fantasmas).
+  // En scatter todos apuntan a su esquina.
   const t = game.ghostMode === 'scatter' ? SCATTER_TARGETS[ g.kind ] : chaseTarget( game, g );
   let best = choices[ 0 ];
   let bestDist = Infinity;
@@ -187,7 +190,7 @@ function decideGhost( game, g ) {
     const d = DIRS[ dir ];
     const nx = g.x + d.x;
     const ny = g.y + d.y;
-    const dist = Math.abs( nx - t.x ) + Math.abs( ny - t.y );
+    const dist = ( nx - t.x ) * ( nx - t.x ) + ( ny - t.y ) * ( ny - t.y );
     if ( dist < bestDist ) {
       bestDist = dist;
       best = dir;
@@ -213,15 +216,15 @@ function moveGhost( game, g ) {
   wrapTunnel( g, width );
 }
 
-// Rebote vertical dentro de la pen entre las filas 13 y 15 (interior ' ').
+// Rebote vertical corto dentro de la pen (y entre 13.5 y 14.5, interior ' ').
 function bounceInPen( g ) {
   const d = DIRS[ g.dir ]; // solo 'up' o 'down'
   g.y += d.y * g.speed;
-  if ( g.dir === 'up' && g.y <= 13 ) {
-    g.y = 13;
+  if ( g.dir === 'up' && g.y <= 13.5 ) {
+    g.y = 13.5;
     g.dir = 'down';
-  } else if ( g.dir === 'down' && g.y >= 15 ) {
-    g.y = 15;
+  } else if ( g.dir === 'down' && g.y >= 14.5 ) {
+    g.y = 14.5;
     g.dir = 'up';
   }
 }
@@ -291,11 +294,22 @@ function update( game ) {
 
   for ( const g of game.ghosts ) {
     if ( g.phase === 'pen' ) {
-      // Rebota y cuenta su retardo; al llegar a 0 pasa a 'leaving'.
+      // Cuenta su retardo: mientras espera se centra en la col 13 y rebota.
+      // Al llegar a 0 se normaliza al centro (y=14) y pasa a 'leaving', de
+      // modo que la salida tarda exactamente delay+32 frames y el escalonado
+      // queda en 2 s exactos entre cada uno.
       if ( g.releaseDelay > 0 ) {
         g.releaseDelay--;
-        bounceInPen( g );
+        const dxc = LEAVE_COL - g.x;
+        if ( Math.abs( dxc ) > 1e-3 ) {
+          g.dir = dxc > 0 ? 'right' : 'left';
+          g.x += Math.sign( dxc ) * Math.min( g.speed, Math.abs( dxc ) );
+        } else {
+          bounceInPen( g );
+        }
       } else {
+        g.y = 14;
+        g.dir = 'up';
         g.phase = 'leaving';
       }
     } else if ( g.phase === 'leaving' ) {

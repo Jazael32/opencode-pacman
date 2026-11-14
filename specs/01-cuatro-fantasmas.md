@@ -1,6 +1,6 @@
 # SPEC 01 — Cuatro fantasmas con personalidades clásicas
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** (ninguno - spec inicial)
 > **Fecha:** 2026-11-13
 > **Objetivo:** Cuatro fantasmas con las personalidades clásicas del arcade (Blinky persigue agresivamente a Pacman), con alternancia chase/scatter y salida escalonada de la pen.
@@ -64,23 +64,23 @@ Convenciones: coordenadas en celdas, origen arriba-izquierda. Retardos y periodo
 
 1. **`src/js/maze.js`**: reemplazar `GHOST_STARTS` por las 4 entradas y añadir `SCATTER_TARGETS` (exportado a `window`). El juego sigue corriendo: los 4 fantasmas se mueven con la IA aleatoria existente.
 2. **`src/js/game.js`** — pen y salida: añadir `phase` y `releaseDelay` por fantasma; rebote vertical dentro de la pen mientras `pen`; secuencia `leaving` (align a col 13, subir hasta fila 11); al llegar, `phase = 'active'`. Manual: blinky activo de inmediato; los otros 3 salen escalonados.
-3. **`src/js/game.js`** — personalidades: reescribir `decideGhost` con los 4 objetivos de chase (blinky/pinky/inky/clyde) usando steering voraz por distancia Manhattan, igual que el `hunter` actual. Inky usa la posición de blinky tal cual (aunque esté en la pen). Manual: cada fantasma corta el paso de forma distinta.
+3. **`src/js/game.js`** — personalidades: reescribir `decideGhost` con los 4 objetivos de chase (blinky/pinky/inky/clyde) usando steering voraz por distancia euclídea al cuadrado (como el arcade; Manhattan empata en el túnel y cicla a los fantasmas). Inky usa la posición de blinky tal cual (aunque esté en la pen). Manual: cada fantasma corta el paso de forma distinta.
 4. **`src/js/game.js`** — modos: `ghostMode` + `modeTimer` en `createGame`; en scatter cada fantasma apunta a su `SCATTER_TARGETS`; al agotar el timer, alternar modo e invertir dirección de los activos. Incluir rearme en `resetPositions`.
 5. **`src/js/render.js`**: `GHOST_COLORS` pasa de índice a `kind` (mapa fijo por fantasma).
 
 ## Criterios de aceptación
 
-- [ ] La consola no muestra errores al abrir `src/index.html`.
-- [ ] Se ven 4 fantasmas simultáneos con colores fijos: rojo, rosa, cian y naranja.
-- [ ] Blinky está activo apenas inicia la partida; pinky, inky y clyde salen de la pen escalonados (~2 s entre cada uno).
-- [ ] En modo scatter los 4 se dirigen a su esquina; en modo chase aplican su personalidad.
-- [ ] Pinky corta el paso por delante de Pacman, no sigue su estela.
-- [ ] El rumbo de inky cambia si blinky se mueve (flanqueo), no solo si se mueve Pacman.
-- [ ] Clyde huye a su esquina al acercarse a ≤8 celdas de Pacman y persigue a distancia mayor.
-- [ ] Ningún fantasma invierte dirección salvo en callejón, cambio de modo o salida de la pen.
-- [ ] Perder una vida devuelve los 4 fantasmas a la pen y el escalonado se repite igual que al inicio.
-- [ ] Ningún fantasma atraviesa paredes; solo cruzan la puerta (valor 3).
-- [ ] Tras reiniciar una partida terminada (won/lost), la configuración de fantasmas es idéntica.
+- [x] La consola no muestra errores al abrir `src/index.html`.
+- [x] Se ven 4 fantasmas simultáneos con colores fijos: rojo, rosa, cian y naranja.
+- [x] Blinky está activo apenas inicia la partida; pinky, inky y clyde salen de la pen escalonados (~2 s entre cada uno).
+- [x] En modo scatter los 4 se dirigen a su esquina; en modo chase aplican su personalidad.
+- [x] Pinky corta el paso por delante de Pacman, no sigue su estela.
+- [x] El rumbo de inky cambia si blinky se mueve (flanqueo), no solo si se mueve Pacman.
+- [x] Clyde huye a su esquina al acercarse a ≤8 celdas de Pacman y persigue a distancia mayor.
+- [x] Ningún fantasma invierte dirección salvo en callejón, cambio de modo o salida de la pen.
+- [x] Perder una vida devuelve los 4 fantasmas a la pen y el escalonado se repite igual que al inicio.
+- [x] Ningún fantasma atraviesa paredes; solo cruzan la puerta (valor 3).
+- [x] Tras reiniciar una partida terminada (won/lost), la configuración de fantasmas es idéntica.
 
 ## Decisiones
 
@@ -88,6 +88,9 @@ Convenciones: coordenadas en celdas, origen arriba-izquierda. Retardos y periodo
 - **Sí:** ciclo fijo 7 s scatter / 20 s chase repetido. El arcade encadena periodos decrecientes (7-20-7-20-5-20-5-∞); se simplifica a ciclo constante.
 - **Sí:** blinky inicia fuera de la pen (como el arcade); el resto sale por tiempo, no por dots.
 - **Sí:** velocidad uniforme `GHOST_SPEED = 0.1` respeta la restricción de `aligned()` sin tocarla.
+- **Sí (enmienda durante la verificación):** steering voraz por **distancia euclídea al cuadrado** en vez de Manhattan. Con Manhattan, los empates del túnel y de la puerta meten a los fantasmas en ciclos (pinky loop túnel/fila 11, inky loop pen↔puerta) y no llegan a su esquina scatter; el arcade real usa euclídea al cuadrado. Verificado: con euclídea los 4 alcanzan su esquina.
+- **Sí (enmienda durante la verificación):** la puerta (3) bloquea también a los fantasmas activos; solo se cruza saliendo de la pen. Sin esto, los activos reentran a la pen (120 cruces en 9000 frames) e inky se cicla dentro.
+- **Sí (enmienda durante la verificación):** pen con rebote corto (y entre 13.5 y 14.5), centrado en la col 13 durante la espera y normalización a y=14 al expirar el retardo. Así la salida tarda exactamente `delay+32` frames y el escalonado es de 2 s exactos (pinky/inky/clyde), al inicio y tras perder vida.
 - **Sí:** temporización por frames (~60 fps). Coherente con el resto del juego, que ya es frame-based.
 - **No:** frightened/power pellets. Requiere ítems nuevos en el maze; merece su propia spec.
 - **No:** reproducir los bugs históricos de pinky/inky (overflow al mirar arriba). Se especifica la intención original.
