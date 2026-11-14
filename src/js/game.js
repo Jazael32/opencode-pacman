@@ -31,6 +31,12 @@ const PEN_STARTS = {
 const SCATTER_FRAMES = 420;  // ~7 s
 const CHASE_FRAMES = 1200;   // ~20 s
 
+// Fright (modo comible) global: duracion y ventana de parpadeo (frames ~60 fps).
+const FRIGHT_FRAMES = 360;   // ~6 s (nivel 1 arcade)
+const FRIGHT_FLASH_AT = 120; // ultimos ~2 s: parpadeo azul/blanco
+const FRIGHT_SPEED = 0.05;   // 1/20 celda/frame (divide 1 en pasos exactos)
+const EYES_SPEED = 0.2;      // 1/5 celda/frame (divide 1 en pasos exactos)
+
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
 function createGame() {
@@ -124,11 +130,20 @@ function movePacman( game ) {
       p.dir = p.nextDir;
       p.nextDir = null;
     }
-    // Comer dot.
-    if ( grid[ p.y ][ p.x ] === 2 ) {
+    // Comer dot o pellet. El pellet activa el fright global: reinicia el timer
+    // y la cadena, e invierte la direccion de los fantasmas activos (arcade).
+    const cell = grid[ p.y ][ p.x ];
+    if ( cell === 2 || cell === 4 ) {
       grid[ p.y ][ p.x ] = 0;
-      game.score += 10;
+      game.score += cell === 4 ? 50 : 10;
       game.dotsRemaining--;
+      if ( cell === 4 ) {
+        game.frightTimer = FRIGHT_FRAMES;
+        game.ghostChain = 0;
+        for ( const g of game.ghosts ) {
+          if ( g.phase === 'active' ) g.dir = OPPOSITE[ g.dir ];
+        }
+      }
     }
     // Si no puede seguir, se detiene en la celda.
     if ( !canMove( grid, p.x, p.y, p.dir, 'pacman' ) ) return;
@@ -175,6 +190,17 @@ function chaseTarget( game, g ) {
   return SCATTER_TARGETS[ g.kind ];
 }
 
+// Velocidad del fantasma segun fase y estado de fright. Los cambios de
+// velocidad solo se aplican en celda alineada (moveGhost rearma g.speed en
+// cada cruce) para no desincronizar el snapping de aligned(): mezclar pasos
+// de 0.1 y 0.05 a mitad de celda puede saltarse el centro exacto.
+function ghostSpeed( game, g ) {
+  if ( g.phase === 'active' ) {
+    return game.frightTimer > 0 ? FRIGHT_SPEED : GHOST_SPEED;
+  }
+  return GHOST_SPEED;
+}
+
 function decideGhost( game, g ) {
   const grid = game.grid;
 
@@ -183,6 +209,13 @@ function decideGhost( game, g ) {
   );
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
+
+  // Fright: direccion aleatoria valida en cada cruce (sin reversa salvo
+  // callejon), como el arcade.
+  if ( game.frightTimer > 0 ) {
+    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
+    return;
+  }
 
   // Steering voraz por distancia euclidea al cuadrado hacia el objetivo
   // (como el arcade; Manhattan empata en el tunel y cicla a los fantasmas).
@@ -210,6 +243,7 @@ function moveGhost( game, g ) {
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
     g.y = Math.round( g.y );
+    g.speed = ghostSpeed( game, g ); // cambio de velocidad solo en celda
     decideGhost( game, g );
     if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
   }
@@ -286,13 +320,18 @@ function update( game ) {
   movePacman( game );
 
   // Modo global: al agotar el timer, alternar scatter/chase e invertir la
-  // direccion de los fantasmas activos.
-  game.modeTimer--;
-  if ( game.modeTimer <= 0 ) {
-    game.ghostMode = game.ghostMode === 'scatter' ? 'chase' : 'scatter';
-    game.modeTimer = game.ghostMode === 'scatter' ? SCATTER_FRAMES : CHASE_FRAMES;
-    for ( const g of game.ghosts ) {
-      if ( g.phase === 'active' ) g.dir = OPPOSITE[ g.dir ];
+  // direccion de los fantasmas activos. Durante el fright el timer del ciclo
+  // queda pausado: al terminar se reanuda donde estaba (arcade).
+  if ( game.frightTimer > 0 ) {
+    game.frightTimer--;
+  } else {
+    game.modeTimer--;
+    if ( game.modeTimer <= 0 ) {
+      game.ghostMode = game.ghostMode === 'scatter' ? 'chase' : 'scatter';
+      game.modeTimer = game.ghostMode === 'scatter' ? SCATTER_FRAMES : CHASE_FRAMES;
+      for ( const g of game.ghosts ) {
+        if ( g.phase === 'active' ) g.dir = OPPOSITE[ g.dir ];
+      }
     }
   }
 
