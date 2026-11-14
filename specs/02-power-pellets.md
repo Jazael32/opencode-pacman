@@ -78,7 +78,7 @@ Convenciones: coordenadas en celdas, tiempos en frames (~60 fps), velocidades qu
 - [ ] En los últimos ~2 s de fright los fantasmas parpadean azul/blanco; al agotarse vuelven a su color y comportamiento.
 - [ ] El ciclo scatter/chase no pierde tiempo durante el fright (se reanuda donde estaba).
 - [ ] Perder una vida limpia el fright y repite el escalonado de la pen igual que al inicio.
-- [ ] La partida se gana solo tras comer dots y pellets (244 ítems), no solo los dots.
+- [ ] La partida se gana solo tras comer dots y pellets (279 ítems: 275 dots + 4 pellets), no solo los dots.
 
 ## Decisiones
 
@@ -90,6 +90,7 @@ Convenciones: coordenadas en celdas, tiempos en frames (~60 fps), velocidades qu
 - **Sí:** velocidades `0.05` (fright) y `0.2` (ojos): ambas dividen 1 celda en pasos exactos, respetando `aligned()` sin tocarla.
 - **Sí:** retorno como ojos con fases nuevas `eaten`/`entering` (SPEC 01 lo dejaba fuera: "no hay muerte de fantasma sin frightened"; ahora la hay).
 - **Sí:** pellets parpadean visible/invisible cada ~15 frames, como el arcade (los dots no).
+- **Sí:** el laberinto heredado de SPEC 01 tiene 276 dots (275 útiles + celda inicial de Pacman), no los 240 del arcade: el total de ítems para ganar es **279** (275 dots + 4 pellets), no 244. Se corrige el criterio de aceptación en consecuencia; recortar el laberinto al dot exacto del arcade queda fuera de alcance.
 - **No:** niveles ni fright decreciente por nivel: no hay sistema de niveles aún.
 - **No:** puntaje flotante (el número sobre el fantasma comido): cosmético del arcade, va aparte.
 - **No:** extra speed de Pacman durante el fright: no aporta verificablemente y toca la restricción de velocidades.
