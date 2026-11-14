@@ -1,6 +1,6 @@
 # SPEC 02 — Power pellets y modo frightened
 
-> **Estado:** Aprovado
+> **Estado:** Implementado
 > **Depende de:** SPEC 01
 > **Fecha:** 2026-11-13
 > **Objetivo:** Cuatro power pellets en las esquinas del laberinto; al comer uno, los fantasmas se vuelven comibles (azules), huyen, parpadean blanco/azul al agotarse el efecto y vuelven a la pen como ojos cuando Pacman se los come.
