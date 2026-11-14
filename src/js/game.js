@@ -27,6 +27,10 @@ const PEN_STARTS = {
   clyde:  { x: 15, y: 14 },
 };
 
+// Ciclo de modos global por tiempo: 7 s scatter -> 20 s chase, repetido.
+const SCATTER_FRAMES = 420;  // ~7 s
+const CHASE_FRAMES = 1200;   // ~20 s
+
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
 function createGame() {
@@ -43,6 +47,8 @@ function createGame() {
     lives: 3,
     dotsRemaining: dots,
     grid,
+    ghostMode: 'scatter',
+    modeTimer: SCATTER_FRAMES,
     pacman: {
       x: PACMAN_START.x,
       y: PACMAN_START.y,
@@ -173,8 +179,8 @@ function decideGhost( game, g ) {
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
 
   // Steering voraz por distancia Manhattan hacia el objetivo, igual que el
-  // hunter original.
-  const t = chaseTarget( game, g );
+  // hunter original. En scatter todos apuntan a su esquina.
+  const t = game.ghostMode === 'scatter' ? SCATTER_TARGETS[ g.kind ] : chaseTarget( game, g );
   let best = choices[ 0 ];
   let bestDist = Infinity;
   for ( const dir of choices ) {
@@ -251,7 +257,8 @@ function resetPositions( game ) {
   p.dir = 'left';
   p.nextDir = null;
   // Los 4 fantasmas vuelven a la pen y el escalonado se repite igual que al
-  // inicio (blinky primero, luego 2 s entre cada uno).
+  // inicio (blinky primero, luego 2 s entre cada uno). El ciclo de modos
+  // tambien se rearma: scatter 7 s -> chase 20 s.
   game.ghosts.forEach( ( g ) => {
     const ps = PEN_STARTS[ g.kind ];
     g.x = ps.x;
@@ -260,6 +267,8 @@ function resetPositions( game ) {
     g.phase = 'pen';
     g.releaseDelay = RELEASE_DELAYS[ g.kind ];
   } );
+  game.ghostMode = 'scatter';
+  game.modeTimer = SCATTER_FRAMES;
 }
 
 function collides( a, b ) {
@@ -268,6 +277,18 @@ function collides( a, b ) {
 
 function update( game ) {
   movePacman( game );
+
+  // Modo global: al agotar el timer, alternar scatter/chase e invertir la
+  // direccion de los fantasmas activos.
+  game.modeTimer--;
+  if ( game.modeTimer <= 0 ) {
+    game.ghostMode = game.ghostMode === 'scatter' ? 'chase' : 'scatter';
+    game.modeTimer = game.ghostMode === 'scatter' ? SCATTER_FRAMES : CHASE_FRAMES;
+    for ( const g of game.ghosts ) {
+      if ( g.phase === 'active' ) g.dir = OPPOSITE[ g.dir ];
+    }
+  }
+
   for ( const g of game.ghosts ) {
     if ( g.phase === 'pen' ) {
       // Rebota y cuenta su retardo; al llegar a 0 pasa a 'leaving'.
