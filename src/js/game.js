@@ -366,7 +366,8 @@ function resetPositions( game ) {
   p.nextDir = null;
   // Los 4 fantasmas vuelven a la pen y el escalonado se repite igual que al
   // inicio (blinky primero, luego 2 s entre cada uno). El ciclo de modos
-  // tambien se rearma: scatter 7 s -> chase 20 s.
+  // tambien se rearma: scatter 7 s -> chase 20 s. Se limpia el fright (timer,
+  // cadena y velocidades: un fantasma comido no revive como ojos).
   game.ghosts.forEach( ( g ) => {
     const ps = PEN_STARTS[ g.kind ];
     g.x = ps.x;
@@ -374,7 +375,10 @@ function resetPositions( game ) {
     g.dir = 'up';
     g.phase = 'pen';
     g.releaseDelay = RELEASE_DELAYS[ g.kind ];
+    g.speed = GHOST_SPEED;
   } );
+  game.frightTimer = 0;
+  game.ghostChain = 0;
   game.ghostMode = 'scatter';
   game.modeTimer = SCATTER_FRAMES;
 }
