@@ -38,15 +38,19 @@ function createGame() {
   // La celda de inicio de Pacman arranca sin dot.
   grid[ PACMAN_START.y ][ PACMAN_START.x ] = 0;
 
-  let dots = 0;
-  for ( const row of grid ) for ( const v of row ) if ( v === 2 ) dots++;
+  let items = 0;
+  for ( const row of grid ) for ( const v of row ) if ( v === 2 || v === 4 ) items++;
 
   return {
     state: 'start',
     score: 0,
     lives: 3,
-    dotsRemaining: dots,
+    dotsRemaining: items,
     grid,
+    // Fright global: frames restantes del efecto (0 = modo normal) y cadena de
+    // fantasmas comidos con el pellet actual (0..3).
+    frightTimer: 0,
+    ghostChain: 0,
     ghostMode: 'scatter',
     modeTimer: SCATTER_FRAMES,
     pacman: {
